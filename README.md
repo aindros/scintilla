@@ -1,7 +1,17 @@
-README for building of Scintilla and SciTE
+# README for building of Scintilla and SciTE
 
 Scintilla can be built by itself.
 To build SciTE, Scintilla must first be built.
+
+## GTK+/FreeBSD version
+You must first have GTK+ 3.24 or later and clang (8.0.1 or better) installed.
+
+To build Scintilla, use *Makefile.bsd* located in the *scintilla/gtk* directory.
+```
+cd scintilla/gtk
+make -f Makefile.bsd
+cd ../..
+```
 
 
 *** GTK+/Linux version ***
