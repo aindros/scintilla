@@ -17,9 +17,9 @@ cd ../..
 If you want use *gmake*, follow instructions for GNU/Linux.
 
 ### Make arguments
-GNU=1
-GTK2=1
-DEBUG=1
+* GNU=1
+* GTK2=1
+* DEBUG=1
 
 *** GTK+/Linux version ***
 
