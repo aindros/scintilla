@@ -7,65 +7,91 @@
 #
 # The License.txt file describes the conditions under which this software may be distributed.
 #
-# This file is still in porting phase. Support for GTK2 will be removed.
-#
+# This file is still in porting phase.
 
 .SUFFIXES: .cxx .c .o .h .a .list
 
-srcdir ?= .
-basedir = $(srcdir)/..
+SRCDIR  ?= .
+BASEDIR  = $(SRCDIR)/..
 
-WARNINGS = -Wpedantic -Wall
+COMPLIB  = $(BASEDIR)/bin/scintilla.a
 
-CXX = clang++
-CC = clang
-WARNINGS += -Wno-deprecated-register
+# Workaround to compile sources in $(BASEDIR)/lexers and put objects in this directory
+LEX_SOURCES != find $(BASEDIR)/lexers -name Lex*.cxx -type f
+LEX_OBJS    != echo ${LEX_SOURCES:.cxx=.o} | sed "s~$(BASEDIR)/lexers/~~g"
+
+# Compilers
+.ifdef GNU
+  CXX = g++
+  CC  = gcc
+.else
+  CXX = clang++
+  CC  = clang
+.endif
+
+# GTK versions
+.ifdef GTK2
+  GTK_VERSION = gtk+-2.0
+.else
+  GTK_VERSION = gtk+-3.0
+.endif
+
 # Can choose aspect to sanitize: address and undefined can simply change SANITIZE but for
 # thread also need to create Position Independent Executable -> search online documentation
 SANITIZE = address
 #SANITIZE = undefined
-BASE_FLAGS += -fsanitize=$(SANITIZE)
+
+# Warnings ---------------------------------------------------------------------
+WARNINGS   = -Wpedantic -Wall -Wno-deprecated-register
+
+# Includes ---------------------------------------------------------------------
+INCLUDES = -I $(BASEDIR)/include -I $(BASEDIR)/src -I $(BASEDIR)/lexlib
+
+# Defines ----------------------------------------------------------------------
+DEFINES = -DGTK -DSCI_LEXER
+.ifdef DEBUG
+  DEFINES += -DDEBUG
+.else
+  DEFINES += -DNDEBUG
+.endif
+
+# Flags ------------------------------------------------------------------------
+BASE_FLAGS    = -fsanitize=$(SANITIZE) $(WARNINGS)
+.ifdef DEBUG
+  BASE_FLAGS += -g
+.else
+  BASE_FLAGS += -Os
+.endif
+
+CONFIG_FLAGS != pkg-config --cflags $(GTK_VERSION)
+
+CXX_BASE_FLAGS = --std=c++17 $(BASE_FLAGS)
+CXX_ALL_FLAGS  = $(DEFINES) $(INCLUDES) $(CXX_BASE_FLAGS) $(CONFIG_FLAGS)
+
+
 
 ARFLAGS = rc
 RANLIB ?= ranlib
-
-GTK_VERSION = $(if $(GTK3),gtk+-3.0,gtk+-2.0)
 
 # Take care of changing Unix style '/' directory separator to '\' on Windows
 normalize = $(if $(windir),$(subst /,\,$1),$1)
 
 PYTHON = $(if $(windir),pyw,python3)
 
-COMPLIB=$(basedir)/bin/scintilla.a
+#vpath %.h $(SRCDIR) $(BASEDIR)/src $(BASEDIR)/include $(BASEDIR)/lexlib
+#vpath %.c $(SRCDIR)
+#vpath %.cxx $(SRCDIR) $(BASEDIR)/src $(BASEDIR)/lexlib $(BASEDIR)/lexers
 
-#vpath %.h $(srcdir) $(basedir)/src $(basedir)/include $(basedir)/lexlib
-#vpath %.c $(srcdir)
-#vpath %.cxx $(srcdir) $(basedir)/src $(basedir)/lexlib $(basedir)/lexers
-
-GLIB = `pkg-config --cflags glib-2.0`
-
-INCLUDES=-I $(basedir)/include -I $(basedir)/src -I $(basedir)/lexlib $(GLIB) `pkg-config --cflags gtk+-3.0`
-DEFINES += -DGTK -DSCI_LEXER
-BASE_FLAGS += $(WARNINGS)
-
-#DEFINES += -D$(if $(DEBUG),DEBUG,NDEBUG)
-DEFINES += -DNDEBUG
-BASE_FLAGS += $(if $(DEBUG),-g,-Os)
-
-CXX_BASE_FLAGS =--std=c++17 $(BASE_FLAGS)
-CXX_ALL_FLAGS =$(DEFINES) $(INCLUDES) $(CXX_BASE_FLAGS) $(CONFIG_FLAGS)
-
-CONFIG_FLAGS:=$(shell pkg-config --cflags $(GTK_VERSION))
 MARSHALLER=scintilla-marshal.o
 
-all: $(LEX_OBJS) $(COMPLIB)
+all: $(COMPLIB)
 
 clean:
 	rm -f *.o
 	rm -f *.plist
 	rm -f $(COMPLIB)
 
-.cxx.o: ${.IMPSRC}
+.cxx.o:
 	$(CXX) $(CXX_ALL_FLAGS) $(CXXFLAGS) -c ${.IMPSRC}
 
 .c.o: ${.IMPSRC}
@@ -80,16 +106,10 @@ GLIB_GENMARSHAL_FLAGS = --prefix=scintilla_marshal
 	$(GLIB_GENMARSHAL) --body $(GLIB_GENMARSHAL_FLAGS) $< > $@
 
 analyze:
-	clang --analyze $(DEFINES) $(INCLUDES) $(CONFIG_FLAGS) $(CXX_BASE_FLAGS) $(CXXFLAGS) $(srcdir)/*.cxx $(basedir)/src/*.cxx $(basedir)/lexlib/*.cxx $(basedir)/lexers/*.cxx
+	clang --analyze $(DEFINES) $(INCLUDES) $(CONFIG_FLAGS) $(CXX_BASE_FLAGS) $(CXXFLAGS) $(SRCDIR)/*.cxx $(BASEDIR)/src/*.cxx $(BASEDIR)/lexlib/*.cxx $(BASEDIR)/lexers/*.cxx
 
 depend deps.mak:
 	$(PYTHON) DepGen.py
-
-LEX_SOURCES!=find $(basedir)/lexers -name Lex*.cxx -type f
-LEX_OBJS=${LEX_SOURCES:.cxx=.o}
-LEX_OBJS2!=ls Lex*.o
-
-#LEX_OBJS:=$(addsuffix .o,$(basename $(sort $(notdir $(wildcard $(basedir)/lexers/Lex*.cxx)))))
 
 # Required for base Scintilla
 SRC_OBJS = \
@@ -142,7 +162,7 @@ GTK_OBJS = \
 	ScintillaGTK.o \
 	ScintillaGTKAccessible.o
 
-$(COMPLIB): $(SRC_OBJS) $(LEXLIB_OBJS) $(GTK_OBJS) $(MARSHALLER) $(LEX_OBJS2)
+$(COMPLIB): $(SRC_OBJS) $(LEXLIB_OBJS) $(GTK_OBJS) $(MARSHALLER) $(LEX_OBJS)
 	$(AR) $(ARFLAGS) ${.TARGET} ${.ALLSRC}
 	$(RANLIB) ${.TARGET}
 
