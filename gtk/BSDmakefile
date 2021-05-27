@@ -56,7 +56,8 @@ DEFINES = -DGTK -DSCI_LEXER
 .endif
 
 # Flags ------------------------------------------------------------------------
-BASE_FLAGS    = -fsanitize=$(SANITIZE) $(WARNINGS)
+#BASE_FLAGS    = -fsanitize=$(SANITIZE) $(WARNINGS)
+BASE_FLAGS    = $(WARNINGS)
 .ifdef DEBUG
   BASE_FLAGS += -g
 .else
